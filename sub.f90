@@ -12,7 +12,8 @@ hmin = 0.05
 dx = 10.0
 dy = 10.0
 dt = 0.1
-
+dttxx = dt*dt/(dx*dx)
+dttyy = dt*dt/(dy*dy)
 ! physical parameters
 g = 9.81
 
@@ -24,29 +25,30 @@ DO k = 0,nx+1
 END DO
 END DO
 
-! land boundaries with 10 m elevation
-DO k = 0,nx+1
- hzero(0,k) = -10.0
-! hzero(1,k) = -0.0
- hzero(ny+1,k) = -10.0
-! hzero(ny,k) = -0.0
-END DO
-
-!DO j = 39,41
-!DO k = 39,41
-!hzero(j,k) = 0.0
+!! land boundaries with 10 m elevation
+!DO k = 0,nx+1
+! hzero(0,k) = -10.0
+!! hzero(1,k) = -0.0
+! hzero(ny+1,k) = -10.0
+!! hzero(ny,k) = -0.0
 !END DO
+!
+!!DO j = 39,41
+!!DO k = 39,41
+!!hzero(j,k) = 0.0
+!!END DO
+!!END DO
+!
+!DO j = 0,ny+1
+! hzero(j,0) = -10.0
+! hzero(j,nx+1) = -10.0
 !END DO
-
-DO j = 0,ny+1
- hzero(j,0) = -10.0
- hzero(j,nx+1) = -10.0
-END DO
 
 DO j = 0,ny+1
 DO k = 0,nx+1
   eta(j,k) = -MIN(0.0,hzero(j,k))
   etan(j,k) = eta(j,k)
+  etap(j,k) = eta(j,k)
 END DO
 END DO
 !XXXXXXXXXXXXXXXXXXX
@@ -75,11 +77,25 @@ REAL :: du(0:ny+1,0:nx+1), dv(0:ny+1,0:nx+1)
 REAL :: uu, vv, duu, dvv
 REAL :: hue, huw, hwp, hwn, hen, hep
 REAL :: hvn, hvs, hsp, hsn, hnn, hnp
+! implicit method to solve sea level predictor
+DO j = 1,ny
+DO k = 1,nx
+  A0(j,k) =   1 - 2.0*g*h(j,k)*(dttxx +dttyy)
+  Axe(j,k) = g*h(j,k+1)*dttxx
+  Axw(j,k) = g*h(j,k-1)*dttxx
+  Ayn(j,k) = g*h(j+1,k)*dttyy
+  Ays(j,k) = g*h(j-1,k)*dttyy
+  B(j,k) = 2*eta(j,k) - etap(j,k)
+  etan(j,k) = eta(j,k)
+END DO
+END DO
+
+call pcg(etan, B)
 
 DO j = 1,ny
 DO k = 1,nx
-  du(j,k) = -dt*g*(eta(j,k+1)-eta(j,k))/dx
-  dv(j,k) = -dt*g*(eta(j+1,k)-eta(j,k))/dy
+  du(j,k) = -dt*g*(etan(j,k+1)-etan(j,k))/dx
+  dv(j,k) = -dt*g*(etan(j+1,k)-etan(j,k))/dy
 END DO
 END DO
 
@@ -110,25 +126,6 @@ END DO
 END DO
 
 
-! sea level predictor
-DO j = 1,ny
-DO k = 1,nx
-  hep = 0.5*(un(j,k)+abs(un(j,k)))*h(j,k)
-  hen = 0.5*(un(j,k)-abs(un(j,k)))*h(j,k+1)
-  hue = hep+hen
-  hwp = 0.5*(un(j,k-1)+abs(un(j,k-1)))*h(j,k-1)
-  hwn = 0.5*(un(j,k-1)-abs(un(j,k-1)))*h(j,k)
-  huw = hwp+hwn
-  
-  hnp = 0.5*(vn(j,k)+abs(vn(j,k)))*h(j,k)
-  hnn = 0.5*(vn(j,k)-abs(vn(j,k)))*h(j+1,k)
-  hvn = hnp+hnn
-  hsp = 0.5*(vn(j-1,k)+abs(vn(j-1,k)))*h(j-1,k)
-  hsn = 0.5*(vn(j-1,k)-abs(vn(j-1,k)))*h(j,k)
-  hvs = hsp+hsn
-  etan(j,k) = eta(j,k)-dt*(hue-huw)/dx-dt*(hvn-hvs)/dy
-END DO
-END DO
 
 END SUBROUTINE dyn
 
