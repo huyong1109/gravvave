@@ -4,71 +4,53 @@ USE param
 CONTAINS
 
 !=======================
-SUBROUTINE presol
-
-end SUBROUTINE presol
 
 subroutine pcg(X,B)
 
-! !INPUT PARAMETERS:
-
-   real (r8), dimension(nx_block,ny_block,max_blocks_tropic), &
-      intent(in) :: &
-      B ! right hand side of linear system
-
-! !INPUT/OUTPUT PARAMETERS:
-
-   real (r8), dimension(nx_block,ny_block,max_blocks_tropic), &
-      intent(inout) :: &
-      X ! on input, an initial guess for the solution
-                         ! on output, solution of the linear system
-
-!EOP
-!BOC
+REAL :: X(0:ny+1,0:nx+1),B(0:ny+1,0:nx+1)
 !-----------------------------------------------------------------------
 !
 ! local variables
 !
 !-----------------------------------------------------------------------
-
-
-   real (r8) :: &
-      eta0,eta1,rr ! scalar inner product results
-
-   real (r8), dimension(nx_block,ny_block,max_blocks_tropic) :: &
+REAL :: eta0,eta1,rr ! scalar inner product results
+INTEGER :: m
+INTEGER :: solv_max_iters = 100
+INTEGER :: solv_ncheck = 1
+REAL :: rms_residual, solv_convrg
+REAL, dimension(0:ny+1,0:nx+1):: &
       R, &! residual (b-Ax)
       S, &! conjugate direction vector
       Q,WORK0,WORK1 ! various cg intermediate results
 
-   character (char_len) :: &
+character (64) :: &
       noconvrg ! error message for no convergence
-    ! hyfile ! editbyhy
-
-
 
 !-----------------------------------------------------------------------
 !
 ! compute initial residual and initialize S
 !
 !-----------------------------------------------------------------------
+      WORK0(:,:) = B(:,:)*B(:,:)
 
-   !$OMP PARALLEL DO PRIVATE(iblock,this_block)
+      rr = array_sum(WORK0) ! (r,r)
+      solv_convrg = solv_tol*rr
+      write(*,*) '||B||=', solv_convrg
+      
+      call btrop_operator(S,X)
+      R(:,:) = B(:,:) - S(:,:)
+      WORK0(:,:) = R(:,:)*R(:,:)
 
+      rr = array_sum(WORK0) ! (r,r)
+      if (rr < solv_convrg) then
+        solv_sum_iters = 0
+        write(*,*) 'Inital value is already a proper solution, res0=', rr
+        return 
+      endif
 
-      call btrop_operator(S,X,this_block,iblock)
-      R(:,:,iblock) = B(:,:,iblock) - S(:,:,iblock)
-      S(:,:,iblock) = c0
-
-   !$OMP END PARALLEL DO
-
-!-----------------------------------------------------------------------
-!
-! initialize fields and scalars
-!
-!-----------------------------------------------------------------------
-
-   eta0 =c1
-   solv_sum_iters = solv_max_iters
+      S(:,:) = 0.
+      eta0 = 1.
+   
 
 !-----------------------------------------------------------------------
 !
@@ -78,179 +60,121 @@ subroutine pcg(X,B)
 
    iter_loop: do m = 1, solv_max_iters
 
-!-----------------------------------------------------------------------
-!
-! calculate (PC)r
-! diagonal preconditioner if preconditioner not specified
-!
-!-----------------------------------------------------------------------
-
-      !$OMP PARALLEL DO PRIVATE(iblock,this_block)
-
-      do iblock=1,nblocks_tropic
-         this_block = get_block(blocks_tropic(iblock),iblock)
-
-         if (lprecond) then
-            call preconditioner(WORK1,R,this_block,iblock)
-         else
-            where (A0(:,:,iblock) /= c0)
-               WORK1(:,:,iblock) = R(:,:,iblock)/A0(:,:,iblock)
-            elsewhere
-               WORK1(:,:,iblock) = c0
-            endwhere
-         endif
-
-         WORK0(:,:,iblock) = R(:,:,iblock)*WORK1(:,:,iblock)
-      end do ! block loop
-
-      !$OMP END PARALLEL DO
+      !write(*,*) R
+      !write(*,*) '111111----------'
+      where (A0(:,:) /= 0.)
+         WORK1(:,:) = R(:,:)/A0(:,:)
+      elsewhere
+         WORK1(:,:) = 0.
+      endwhere
+    
+      !write(*,*) WORK1
+      !nwrite(*,*) '-----22222-----'
+      WORK0(:,:) = R(:,:)*WORK1(:,:)
 
 !-----------------------------------------------------------------------
 !
 ! update conjugate direction vector s
 !
 !-----------------------------------------------------------------------
-
       !*** (r,(PC)r)
-      eta1 = global_sum(WORK0, distrb_tropic, field_loc_center, RCALCT_B)
-
-      !$OMP PARALLEL DO PRIVATE(iblock,this_block)
-
-      do iblock=1,nblocks_tropic
-         this_block = get_block(blocks_tropic(iblock),iblock)
-
-         S(:,:,iblock) = WORK1(:,:,iblock) + S(:,:,iblock)*(eta1/eta0)
+      eta1 = array_sum(WORK0)
+      S(:,:) = WORK1(:,:) + S(:,:)*(eta1/eta0)
 
 !-----------------------------------------------------------------------
 !
 ! compute As
 !
 !-----------------------------------------------------------------------
-
-         call btrop_operator(Q,S,this_block,iblock)
-         WORK0(:,:,iblock) = Q(:,:,iblock)*S(:,:,iblock)
-
-      end do ! block loop
-
-      !$OMP END PARALLEL DO
-
+       call btrop_operator(Q,S)
+       WORK0(:,:) = Q(:,:)*S(:,:)
 !-----------------------------------------------------------------------
 !
 ! compute next solution and residual
 !
 !-----------------------------------------------------------------------
-
-
       eta0 = eta1
-      eta1 = eta0/global_sum(WORK0, distrb_tropic, &
-                             field_loc_center, RCALCT_B)
+      eta1 = eta0/array_sum(WORK0)
 
-      !$OMP PARALLEL DO PRIVATE(iblock,this_block)
-
-      do iblock=1,nblocks_tropic
-         this_block = get_block(blocks_tropic(iblock),iblock)
-
-         X(:,:,iblock) = X(:,:,iblock) + eta1*S(:,:,iblock)
-         R(:,:,iblock) = R(:,:,iblock) - eta1*Q(:,:,iblock)
-
-         if (mod(m,solv_ncheck) == 0) then
-
-            call btrop_operator(R,X,this_block,iblock)
-            R(:,:,iblock) = B(:,:,iblock) - R(:,:,iblock)
-            WORK0(:,:,iblock) = R(:,:,iblock)*R(:,:,iblock)
-         endif
-      end do ! block loop
-
-      !$OMP END PARALLEL DO
-
-!-----------------------------------------------------------------------
-!
-! test for convergence
-!
-!-----------------------------------------------------------------------
+      X(:,:) = X(:,:) + eta1*S(:,:)
+      R(:,:) = R(:,:) - eta1*Q(:,:)
 
       if (mod(m,solv_ncheck) == 0) then
-
-         call update_ghost_cells(R, bndy_tropic, field_loc_center,&
-                                                 field_type_scalar)
-
-         rr = global_sum(WORK0, distrb_tropic, &
-                         field_loc_center, RCALCT_B) ! (r,r)
-
-         if (rr < solv_convrg) then
-            solv_sum_iters = m
-            exit iter_loop
+         call btrop_operator(R,X)
+         R(:,:) = B(:,:) - R(:,:)
+         WORK0(:,:) = R(:,:)*R(:,:)
+         rr = array_sum(WORK0) ! (r,r)
+         write(*,*) 'iter = ', m, 'res = ', rr ,'solv_c', solv_convrg
+         if (rr < solv_convrg ) then
+     	exit iter_loop
+         elseif ( rr > 1.0e20) then
+     	write(*,*) 'PCG solver diverged! '
+           	write(*,*) 'Program exit here '
+           	stop 
          endif
 
       endif
 
-   enddo iter_loop
-      call update_ghost_cells(X, bndy_tropic, field_loc_center, &
-                                              field_type_scalar)
+      enddo iter_loop
 
-   rms_residual = sqrt(rr*resid_norm)
-
-   if (solv_sum_iters == solv_max_iters) then
-      if (solv_convrg /= c0) then
-         write(noconvrg,'(a45,i11)') &
-           'Barotropic solver not converged at time step ', nsteps_total
-         call exit_POP(sigAbort,noconvrg)
+      if (m  == solv_max_iters) then
+         if (solv_convrg /= c0) then
+            write(*,*) 'Not converge, res = ', rr 
+            stop
+         endif
       endif
-   endif
 
 !-----------------------------------------------------------------------
 
  end subroutine pcg
  
 subroutine btrop_operator(AX,X)
-
-! !DESCRIPTION:
-! This routine applies the nine-point stencil operator for the
-! barotropic solver. It takes advantage of some 9pt weights being
-! shifted versions of others.
-!
-! !REVISION HISTORY:
-! same as module
-
 ! !INPUT PARAMETERS:
-
-   real (r8), dimension(nx_block,ny_block,max_blocks_tropic), &
-      intent(in) :: &
+REAL, dimension(0:ny+1,0:nx+1), intent(in) :: &
       X ! array to be operated on
-
-! !OUTPUT PARAMETERS:
-
-   real (r8), dimension(nx_block,ny_block,max_blocks_tropic), &
-      intent(out) :: &
+REAL, dimension(0:ny+1,0:nx+1),intent(out) :: &
       AX ! nine point operator result (Ax)
 
-!-----------------------------------------------------------------------
-!
-! local variables
-!
-!-----------------------------------------------------------------------
+   AX(:,:) = 0.
 
-   integer (int_kind) :: &
-      i,j ! dummy counters
-
-!-----------------------------------------------------------------------
-
-   AX(:,:,bid) = c0
-
-   do j=this_block%jb,this_block%je
-   do i=this_block%ib,this_block%ie
-      AX(i,j,bid) =abs( A0 (i ,j ,bid)*X(i ,j ,bid)) + &
-                   abs( AN (i ,j ,bid)*X(i ,j+1,bid)) + &
-                   abs( AN (i ,j-1,bid)*X(i ,j-1,bid)) + &
-                   abs( AE (i ,j ,bid)*X(i+1,j ,bid)) + &
-                   abs( AE (i-1,j ,bid)*X(i-1,j ,bid)) + &
-                   abs( ANE(i ,j ,bid)*X(i+1,j+1,bid)) + &
-                   abs( ANE(i ,j-1,bid)*X(i+1,j-1,bid)) + &
-                   abs( ANE(i-1,j ,bid)*X(i-1,j+1,bid)) + &
-                   abs( ANE(i-1,j-1,bid)*X(i-1,j-1,bid))
+   do j= 1,ny
+   do k= 1,nx
+      AX(j,k) =  A0(j,k)*X(j,k) +&
+		 Axe(j,k)*X(j,k+1) +&
+		 Axw(j,k)*X(j,k-1) +&
+		 Ayn(j,k)*X(j+1,k) +&
+		 Ays(j,k)*X(j-1,k)
    end do
    end do
 
-!-----------------------------------------------------------------------
+ end subroutine btrop_operator
 
- end subroutine btrop_operator_abs
+function array_sum(X)
+
+REAL, dimension(0:ny+1,0:nx+1), intent(in) :: &
+      X ! array to be operated on
+REAL :: array_sum
+
+   array_sum = 0.
+   do j= 1,ny
+   do k= 1,nx
+       array_sum = array_sum + X(j,k)
+   end do
+   end do
+
+end function  array_sum
+function array_sum_abs(X)
+
+REAL, dimension(0:ny+1,0:nx+1), intent(in) :: &
+      X ! array to be operated on
+REAL :: array_sum_abs
+
+   array_sum_abs = 0.
+   do j= 1,ny
+   do k= 1,nx
+       array_sum_abs = array_sum_abs + abs(X(j,k))
+   end do
+   end do
+
+end function  array_sum_abs
+END MODULE sol

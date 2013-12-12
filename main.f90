@@ -63,10 +63,10 @@ c = SQRT(2*g*hmax)
 ! determine stability parameter
 lambda = dt*SQRT(g*hmax)/MIN(dx,dy)
 
-IF(lambda > 1)THEN
-  WRITE(6,*) "This will not work. Do you know why?"   
-  STOP
-END IF
+!IF(lambda > 1)THEN
+!  WRITE(6,*) "This will not work. Do you know why?"   
+!  STOP
+!END IF
 
 ! open files for output
 OPEN(10,file ='eta.dat',form='formatted')
@@ -92,7 +92,7 @@ CALL dyn
 
 ! updating including Shapiro filter
 
-CALL shapiro
+!CALL shapiro
 
 DO j = 0,ny+1
 DO k = 0,nx+1
@@ -101,6 +101,7 @@ DO k = 0,nx+1
   IF(h(j,k)<hmin)wet(j,k) = 0
   u(j,k) = un(j,k)
   v(j,k) = vn(j,k)
+  etan(j,k) = eta(j,k)
 END DO
 END DO
 
