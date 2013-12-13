@@ -12,9 +12,9 @@ hmin = 0.05
 ! grid parameters
 dx = 10.0
 dy = 10.0
-dt = 0.1*5
-dtxx = dt/(dx*dx)
-dtyy = dt/(dy*dy)
+dt = 0.1
+dtxx = dt*dt/(dx*dx)
+dtyy = dt*dt/(dy*dy)
 ! physical parameters
 g = 9.81
 
