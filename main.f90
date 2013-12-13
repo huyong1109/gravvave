@@ -43,7 +43,7 @@ CLOSE(10)
 eps = 0.05
 
 ! runtime parameters
-ntot = 100
+ntot = 50
 
 ! output parameter
 nout = 1

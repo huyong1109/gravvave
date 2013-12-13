@@ -19,7 +19,7 @@ subroutine GAUSS(a,b,c,d,x)
 
 implicit none
 INTEGER ::  k
-REAL, dimension(nx) :: a,b,c,d,x
+REAL, dimension(0:nx+1) :: a,b,c,d,x
 REAL, dimension(0:nx) :: cc,dd
 REAL :: y
 !write(*,*) ' ====a=============='
@@ -41,7 +41,7 @@ REAL :: y
        end do
        dd(nx) = (d(nx)-dd(nx-1)*a(nx))/(b(nx)-cc(nx-1)*a(nx))
      
-       x(nx+1) = 0. 
+       x(:) = 0. 
        do k=nx,1,-1
 	  x(k)  = dd(k) - cc(k)*x(k+1)
        end do

@@ -121,43 +121,22 @@ END DO
 !c = (/0 1,2,0/)
 !d = (/4,14,18/)
 !call GAUSS(aa,b,c,d, x,3)
+etau(:,:) = 0.
+etav(:,:) = 0.
 do j = 1,ny
-    call GAUSS(Auw(j,:),Au0(j,:),Aue(j,:), Bu(j,:),etau(j,:))
+    call GAUSS(Auw(j,:),Au0(j,:),Aue(j,:), Bu(j,:),etau(j,1:nx))
 end do
 do k = 1,nx
-    call GAUSS(Avn(:,k),Av0(:,k),Avs(:,k), Bv(:,k),etav(:,k))
+    call GAUSS(Avn(:,k),Av0(:,k),Avs(:,k), Bv(:,k),etav(1:ny,k))
 end do
 DO j = 1,ny
 DO k = 1,nx
-  du(j,k) = -dt*g*(etau(j,k+1)-etau(j,k))/dx
-  dv(j,k) = -dt*g*(etav(j+1,k)-etav(j,k))/dy
+  un(j,k) = u(j,k)-dt*g*(etau(j,k+1)-etau(j,k))/dx
+  vn(j,k) = v(j,k)-dt*g*(etav(j+1,k)-etav(j,k))/dy
 END DO
 END DO
 
-DO j = 1,ny
-DO k = 1,nx
-! prediction for u
-un(j,k) = 0.0
-uu = u(j,k)
-duu = du(j,k)
-IF(wet(j,k)==1) THEN
-  IF((wet(j,k+1)==1).or.(duu>0.0)) un(j,k) = uu+duu
-ELSE
-  IF((wet(j,k+1)==1).and.(duu<0.0)) un(j,k) = uu+duu
-END IF
 
-! prediction for v
-vv = v(j,k)
-dvv = dv(j,k)
-vn(j,k) = 0.0
-IF(wet(j,k)==1) THEN
-  IF((wet(j+1,k)==1).or.(dvv>0.0)) vn(j,k) = vv+dvv
-ELSE
-  IF((wet(j+1,k)==1).and.(dvv<0.0)) vn(j,k) = vv+dvv
-END IF
-
-END DO
-END DO
 ! cross chase and follow
 DO j = 1,ny
 DO k = 1,nx
@@ -179,16 +158,16 @@ end do
 
 DO j = 1,ny
 DO k = 1,nx
-  du(j,k) = -dt*g*(etau(j,k+1)-etau(j,k))/dx
-  dv(j,k) = -dt*g*(etav(j+1,k)-etav(j,k))/dy
+  un(j,k) = un(j,k)-dt*g*(etau(j,k+1)-etau(j,k))/dx
+  vn(j,k) = vn(j,k)-dt*g*(etav(j+1,k)-etav(j,k))/dy
 END DO
 END DO
 DO j = 1,ny
 DO k = 1,nx
 ! prediction for u
-un(j,k) = 0.0
+
 uu = u(j,k)
-duu = du(j,k)
+duu = dt*un(j,k)
 IF(wet(j,k)==1) THEN
   IF((wet(j,k+1)==1).or.(duu>0.0)) un(j,k) = uu+duu
 ELSE
@@ -197,21 +176,14 @@ END IF
 
 ! prediction for v
 vv = v(j,k)
-dvv = dv(j,k)
-vn(j,k) = 0.0
+dvv = dt*vn(j,k)
 IF(wet(j,k)==1) THEN
   IF((wet(j+1,k)==1).or.(dvv>0.0)) vn(j,k) = vv+dvv
 ELSE
   IF((wet(j+1,k)==1).and.(dvv<0.0)) vn(j,k) = vv+dvv
 END IF
 
-END DO
-END DO
-
-DO j = 1,ny
-DO k = 1,nx
-  un(j,k) = u(j,k) + dt*un(j,k)
-  vn(j,k) = v(j,k) + dt*vn(j,k)
+! prediction for eta
   etan(j,k) = eta(j,k) + dt*(etau(j,k)+etav(j,k))
 END DO
 END DO
