@@ -15,8 +15,8 @@ USE param
 USE sub
 
 ! local parameters
-REAL :: hmax,time,dtmax
-REAL :: c,lambda
+REAL*8 :: hmax, time,dtmax
+REAL*8 :: c,lambda
 INTEGER :: n,ntot,nout
 
 !**********
@@ -43,10 +43,11 @@ CLOSE(10)
 eps = 0.05
 
 ! runtime parameters
-ntot = 1000
+ntot = INT(100/dt)
 
 ! output parameter
-nout = 5
+nout = INT(0.5/dt)
+write(*,*) 'Run ',ntot,'iter, output every ',nout, 'iter' 
 
 ! determine maximum water depth
 hmax = 0.

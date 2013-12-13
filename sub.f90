@@ -12,14 +12,14 @@ hmin = 0.05
 ! grid parameters
 dx = 10.0
 dy = 10.0
-dt = 0.1*5
+dt = 0.1*2
 dtxx = dt/(dx*dx)
 dtyy = dt/(dy*dy)
 ! physical parameters
 g = 9.81
 
 ! init solver
-solv_tol = 1.0e-24
+solv_tol = 1.0e-32
 write(*,*) 'solv_tol', solv_tol
 ! initial conditions
 
@@ -83,11 +83,11 @@ END SUBROUTINE init
 SUBROUTINE dyn
 
 ! local parameters
-REAL :: du(0:ny+1,0:nx+1), dv(0:ny+1,0:nx+1)
-REAL :: uu, vv, duu, dvv
-REAL :: hue, huw, hwp, hwn, hen, hep
-REAL :: hvn, hvs, hsp, hsn, hnn, hnp
-REAL :: temp
+REAL*8 :: du(0:ny+1,0:nx+1), dv(0:ny+1,0:nx+1)
+REAL*8 :: uu, vv, duu, dvv
+REAL*8 :: hue, huw, hwp, hwn, hen, hep
+REAL*8 :: hvn, hvs, hsp, hsn, hnn, hnp
+REAL*8 :: temp
 ! implicit method to solve sea level predictor
 
 DO j = 1,ny
@@ -172,7 +172,7 @@ END SUBROUTINE dyn
 SUBROUTINE shapiro
 
 !local parameters
-REAL :: term1,term2,term3
+REAL*8 :: term1,term2,term3
 
 ! 1-order Shapiro filter
 

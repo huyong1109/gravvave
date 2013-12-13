@@ -7,18 +7,18 @@ CONTAINS
 
 subroutine pcg(X,B)
 
-REAL :: X(0:ny+1,0:nx+1),B(0:ny+1,0:nx+1)
+REAL*8 :: X(0:ny+1,0:nx+1),B(0:ny+1,0:nx+1)
 !-----------------------------------------------------------------------
 !
 ! local variables
 !
 !-----------------------------------------------------------------------
-REAL :: eta0,eta1,rr ! scalar inner product results
+REAL*8 :: eta0,eta1,rr ! scalar inner product results
 INTEGER :: m
 INTEGER :: solv_max_iters = 100
 INTEGER :: solv_ncheck = 1
-REAL :: rms_residual, solv_convrg
-REAL, dimension(0:ny+1,0:nx+1):: &
+REAL*8 :: rms_residual, solv_convrg
+REAL*8, dimension(0:ny+1,0:nx+1):: &
       R, &! residual (b-Ax)
       S, &! conjugate direction vector
       Q,WORK0,WORK1 ! various cg intermediate results
@@ -27,14 +27,12 @@ character (64) :: &
       noconvrg ! error message for no convergence
 
 !-----------------------------------------------------------------------
-!
 ! compute initial residual and initialize S
-!
 !-----------------------------------------------------------------------
       WORK0(:,:) = B(:,:)*B(:,:)
 
       rr = array_sum(WORK0) ! (r,r)
-      solv_convrg = solv_tol*rr
+      solv_convrg = solv_tol*sqrt(rr)
       write(*,*) '||B||=', solv_convrg
       
       call btrop_operator(S,X)
@@ -53,9 +51,7 @@ character (64) :: &
    
 
 !-----------------------------------------------------------------------
-!
 ! iterate
-
 !-----------------------------------------------------------------------
 
    iter_loop: do m = 1, solv_max_iters
@@ -73,25 +69,19 @@ character (64) :: &
       WORK0(:,:) = R(:,:)*WORK1(:,:)
 
 !-----------------------------------------------------------------------
-!
 ! update conjugate direction vector s
-!
 !-----------------------------------------------------------------------
       !*** (r,(PC)r)
       eta1 = array_sum(WORK0)
       S(:,:) = WORK1(:,:) + S(:,:)*(eta1/eta0)
 
 !-----------------------------------------------------------------------
-!
 ! compute As
-!
 !-----------------------------------------------------------------------
        call btrop_operator(Q,S)
        WORK0(:,:) = Q(:,:)*S(:,:)
 !-----------------------------------------------------------------------
-!
 ! compute next solution and residual
-!
 !-----------------------------------------------------------------------
       eta0 = eta1
       eta1 = eta0/array_sum(WORK0)
@@ -103,14 +93,14 @@ character (64) :: &
          call btrop_operator(R,X)
          R(:,:) = B(:,:) - R(:,:)
          WORK0(:,:) = R(:,:)*R(:,:)
-         rr = array_sum(WORK0) ! (r,r)
+         rr = sqrt(array_sum(WORK0))! (r,r)
          write(*,*) 'iter = ', m, 'res = ', rr ,'solv_c', solv_convrg
          if (rr < solv_convrg ) then
-     	exit iter_loop
+	    exit iter_loop
          elseif ( rr > 1.0e20) then
-     	write(*,*) 'PCG solver diverged! '
-           	write(*,*) 'Program exit here '
-           	stop 
+	    write(*,*) 'PCG solver diverged! '
+            write(*,*) 'Program exit here '
+            stop 
          endif
 
       endif
@@ -130,9 +120,9 @@ character (64) :: &
  
 subroutine btrop_operator(AX,X)
 ! !INPUT PARAMETERS:
-REAL, dimension(0:ny+1,0:nx+1), intent(in) :: &
+REAL*8, dimension(0:ny+1,0:nx+1), intent(in) :: &
       X ! array to be operated on
-REAL, dimension(0:ny+1,0:nx+1),intent(out) :: &
+REAL*8, dimension(0:ny+1,0:nx+1),intent(out) :: &
       AX ! nine point operator result (Ax)
 
    AX(:,:) = 0.
@@ -151,9 +141,9 @@ REAL, dimension(0:ny+1,0:nx+1),intent(out) :: &
 
 function array_sum(X)
 
-REAL, dimension(0:ny+1,0:nx+1), intent(in) :: &
+REAL*8, dimension(0:ny+1,0:nx+1), intent(in) :: &
       X ! array to be operated on
-REAL :: array_sum
+REAL*8 :: array_sum
 
    array_sum = 0.
    do j= 1,ny
@@ -165,9 +155,9 @@ REAL :: array_sum
 end function  array_sum
 function array_sum_abs(X)
 
-REAL, dimension(0:ny+1,0:nx+1), intent(in) :: &
+REAL*8, dimension(0:ny+1,0:nx+1), intent(in) :: &
       X ! array to be operated on
-REAL :: array_sum_abs
+REAL*8 :: array_sum_abs
 
    array_sum_abs = 0.
    do j= 1,ny
