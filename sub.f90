@@ -13,14 +13,17 @@ hmin = 0.05
 dx = 10.0
 dy = 10.0
 dt = 0.1
+g = 9.81
+
+xxgtt = dx*dx/(g*dt*dt)
+yygtt = dy*dy/(g*dt*dt)
+!write(*,*) xxgtt,' = xxgtt'
 dtxx = dt*dt/(dx*dx)
 dtyy = dt*dt/(dy*dy)
 ! physical parameters
-g = 9.81
 
 ! init solver
-solv_tol = 1.0e-24
-write(*,*) 'solv_tol', solv_tol
+
 ! initial conditions
 
 DO j = 0,ny+1
@@ -52,7 +55,6 @@ DO j = 0,ny+1
 DO k = 0,nx+1
   eta(j,k) = -MIN(0.0,hzero(j,k))
   etan(j,k) = eta(j,k)
-  etap(j,k) = eta(j,k)
 END DO
 END DO
 !XXXXXXXXXXXXXXXXXXX
@@ -71,19 +73,21 @@ DO k = 0,nx+1
 END DO
 END DO
 
-A0(:,:) = 0.
-Axe(:,:) = 0.
-Axw(:,:) = 0.
-Ayn(:,:) = 0.
-Ays(:,:) = 0.
-B(:,:) = 0.
+Au0(:,:) = 0.
+Aue(:,:) = 0.
+Auw(:,:) = 0.
+Avn(:,:) = 0.
+Avs(:,:) = 0.
+Bu(:,:) = 0.
+Bv(:,:) = 0.
 END SUBROUTINE init
 
 !================
 SUBROUTINE dyn
 
 ! local parameters
-REAL :: du(0:ny+1,0:nx+1), dv(0:ny+1,0:nx+1)
+REAL, dimension(0:ny+1,0:nx+1):: du,dv
+REAL, dimension(3) :: aa,b,c,d,x
 REAL :: uu, vv, duu, dvv
 REAL :: hue, huw, hwp, hwn, hen, hep
 REAL :: hvn, hvs, hsp, hsn, hnn, hnp
@@ -94,53 +98,93 @@ DO j = 1,ny
 DO k = 1,nx
   hue = 0.5*( h(j,k) +h(j,k+1))
   huw = 0.5*( h(j,k) +h(j,k-1))
-  hvn = 0.5*( h(j,k+1) +h(j,k))
-  hvs = 0.5*( h(j,k-1) +h(j,k))
-  A0(j,k) =   1 + g*(dtxx*(hue+huw) +dtyy*(hvn+hvs))
-  Axe(j,k) = -g*hue*dtxx
-  Axw(j,k) = -g*huw*dtxx
-  Ayn(j,k) = -g*hvn*dtyy
-  Ays(j,k) = -g*hvs*dtyy
-  B(j,k) =  eta(j,k) -&
-	dt*((hue*u(j,k)-huw*u(j,k-1))/dx+(hvn*v(j,k)-hvs*v(j-1,k))/dy)
+  hvn = 0.5*( h(j+1,k) +h(j,k))
+  hvs = 0.5*( h(j-1,k) +h(j,k))
+  Au0(j,k) =   xxgtt + hue +huw
+  Av0(j,k) =   yygtt + hvn +hvs
+
+  Aue(j,k) =  -hue
+  Auw(j,k) =  -huw
+  Avn(j,k) =  -hvn
+  Avs(j,k) =  -hvs
+  Bu(j,k) = xxgtt*eta(j,k) -&
+	dx/(g*dt)*(hue*u(j,k)-huw*u(j,k-1))
+  Bv(j,k) = yygtt*eta(j,k) -&
+	dy/(g*dt)*(hvn*v(j,k)-hvs*v(j-1,k))
   !etan(j,k) = eta(j,k)
 END DO
 END DO
 
-!write(*,*) A0
-!write(*,*) Axe
 
-!      temp  = array_sum_abs(A0)
-!	    write(*,*) 'sum(A0) = ',temp
-!      temp  = array_sum_abs(Axe)
-!	    write(*,*) 'sum(A0) = ',temp
-!      temp  = array_sum_abs(Ays)
-!	    write(*,*) 'sum(A0) = ',temp
-!      temp  = array_sum_abs(B)
-!	    write(*,*) 'sum(B) = ',temp
-!      temp  = array_sum_abs(B)
-!	    write(*,*) 'sum(B) = ',temp
-!      etan(:,:) = 1.
-!      call btrop_operator(B, etan)
-!!
-!      temp  = array_sum_abs(B)
-!	    write(*,*) 'sum(B) = ',temp
-!   
-!     etan(:,:) = 0.
-call pcg(etan, B)
-
-CALL shapiro
-! write(*,*) etan
+!aa = (/0 0,2,3 0 /)
+!b = (/0 2,3,4 0/)
+!c = (/0 1,2,0/)
+!d = (/4,14,18/)
+!call GAUSS(aa,b,c,d, x,3)
+do j = 1,ny
+    call GAUSS(Auw(j,:),Au0(j,:),Aue(j,:), Bu(j,:),etau(j,:))
+end do
+do k = 1,nx
+    call GAUSS(Avn(:,k),Av0(:,k),Avs(:,k), Bv(:,k),etav(:,k))
+end do
 DO j = 1,ny
 DO k = 1,nx
-  du(j,k) = -dt*g*(eta(j,k+1)-eta(j,k))/dx
-  dv(j,k) = -dt*g*(eta(j+1,k)-eta(j,k))/dy
+  du(j,k) = -dt*g*(etau(j,k+1)-etau(j,k))/dx
+  dv(j,k) = -dt*g*(etav(j+1,k)-etav(j,k))/dy
 END DO
 END DO
 
 DO j = 1,ny
 DO k = 1,nx
+! prediction for u
+un(j,k) = 0.0
+uu = u(j,k)
+duu = du(j,k)
+IF(wet(j,k)==1) THEN
+  IF((wet(j,k+1)==1).or.(duu>0.0)) un(j,k) = uu+duu
+ELSE
+  IF((wet(j,k+1)==1).and.(duu<0.0)) un(j,k) = uu+duu
+END IF
 
+! prediction for v
+vv = v(j,k)
+dvv = dv(j,k)
+vn(j,k) = 0.0
+IF(wet(j,k)==1) THEN
+  IF((wet(j+1,k)==1).or.(dvv>0.0)) vn(j,k) = vv+dvv
+ELSE
+  IF((wet(j+1,k)==1).and.(dvv<0.0)) vn(j,k) = vv+dvv
+END IF
+
+END DO
+END DO
+! cross chase and follow
+DO j = 1,ny
+DO k = 1,nx
+
+  Bu(j,k) = xxgtt*etau(j,k) -&
+	dx/(g*dt)*(hue*un(j,k)-huw*un(j,k-1))
+  Bv(j,k) = yygtt*etav(j,k) -&
+	dy/(g*dt)*(hvn*vn(j,k)-hvs*vn(j-1,k))
+  !etan(j,k) = eta(j,k)
+END DO
+END DO
+
+do j = 1,ny
+    call GAUSS(Auw(j,:),Au0(j,:),Aue(j,:), Bv(j,:),etav(j,:))
+end do
+do k = 1,nx
+    call GAUSS(Avn(:,k),Av0(:,k),Avs(:,k), Bu(:,k),etau(:,k))
+end do
+
+DO j = 1,ny
+DO k = 1,nx
+  du(j,k) = -dt*g*(etau(j,k+1)-etau(j,k))/dx
+  dv(j,k) = -dt*g*(etav(j+1,k)-etav(j,k))/dy
+END DO
+END DO
+DO j = 1,ny
+DO k = 1,nx
 ! prediction for u
 un(j,k) = 0.0
 uu = u(j,k)
@@ -164,6 +208,17 @@ END IF
 END DO
 END DO
 
+DO j = 1,ny
+DO k = 1,nx
+  un(j,k) = u(j,k) + dt*un(j,k)
+  vn(j,k) = v(j,k) + dt*vn(j,k)
+  etan(j,k) = eta(j,k) + dt*(etau(j,k)+etav(j,k))
+END DO
+END DO
+
+CALL shapiro
+
+! write(*,*) etan
 
 
 END SUBROUTINE dyn
