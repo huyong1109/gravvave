@@ -15,8 +15,8 @@ USE param
 USE sub
 
 ! local parameters
-REAL :: hmax,time,dtmax
-REAL :: c,lambda
+REAL*8 :: hmax,time,dtmax
+REAL*8 :: c,lambda
 INTEGER :: n,ntot,nout
 
 !**********

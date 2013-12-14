@@ -12,7 +12,7 @@ hmin = 0.05
 ! grid parameters
 dx = 10.0
 dy = 10.0
-dt = 0.1
+dt = 0.1*5
 g = 9.81
 
 xxgtt = dx*dx/(g*dt*dt)
@@ -86,12 +86,12 @@ END SUBROUTINE init
 SUBROUTINE dyn
 
 ! local parameters
-REAL, dimension(0:ny+1,0:nx+1):: unv, vnu, du,dv
-!REAL, dimension(3) :: aa,b,c,d,x
-REAL :: uu, vv, duu, dvv
-REAL :: hue, huw, hwp, hwn, hen, hep
-REAL :: hvn, hvs, hsp, hsn, hnn, hnp
-REAL :: temp
+REAL*8, dimension(0:ny+1,0:nx+1)::  uy,uz,vy,vz, detau,detav
+!REAL*8, dimension(3) :: aa,b,c,d,x
+REAL*8 :: uu, vv, duu, dvv
+REAL*8 :: hue, huw, hwp, hwn, hen, hep
+REAL*8 :: hvn, hvs, hsp, hsn, hnn, hnp
+REAL*8 :: temp
 ! implicit method to solve sea level predictor
 
 DO j = 1,ny
@@ -115,15 +115,9 @@ DO k = 1,nx
 END DO
 END DO
 
-
-!aa = (/0 0,2,3 0 /)
-!b = (/0 2,3,4 0/)
-!c = (/0 1,2,0/)
-!d = (/4,14,18/)
-!call GAUSS(aa,b,c,d, x,3)
+! first step
 etau(:,:) = 0.
 etav(:,:) = 0.
-etau(1,:) = etav(:,1)
 do j = 1,ny
     write(*,*) 'gauss in j = ', j
     call GAUSS(Auw(j,:),Au0(j,:),Aue(j,:), Bu(j,:),etau(j,:),nx)
@@ -133,10 +127,18 @@ do k = 1,nx
     write(*,*) 'gauss in k = ', k
     call GAUSS(Avn(:,k),Av0(:,k),Avs(:,k), Bv(:,k),etav(:,k),ny)
 end do
+uy(:,:) = 0.
+vz(:,:) = 0.
+vy(:,:) = 0.
+uz(:,:) = 0.
+detau(:,:) = 0.
+detav(:,:) = 0.
 DO j = 1,ny
 DO k = 1,nx
-  un(j,k) = u(j,k)-dt*g*(etau(j,k+1)-etau(j,k))/dx
-  vn(j,k) = v(j,k)-dt*g*(etav(j+1,k)-etav(j,k))/dy
+  uy(j,k) = -g*(etau(j,k+1)-etau(j,k))/dx
+  detau(j,k) = (etau(j,k)-eta(j,k))/dt
+  vz(j,k) = -g*(etav(j+1,k)-etav(j,k))/dy
+  detav(j,k) = (etav(j,k)-eta(j,k))/dt
 END DO
 END DO
 
@@ -145,10 +147,10 @@ END DO
 DO j = 1,ny
 DO k = 1,nx
 
-  Bu(j,k) = xxgtt*etau(j,k) -&
-	dx/(g*dt)*(hue*un(j,k)-huw*un(j,k-1))
-  Bv(j,k) = yygtt*etav(j,k) -&
-	dy/(g*dt)*(hvn*vn(j,k)-hvs*vn(j-1,k))
+  Bu(j,k) = xxgtt*detau(j,k)! -&
+	!dx/(g*dt)*(hue*un(j,k)-huw*un(j,k-1))
+  Bv(j,k) = yygtt*detav(j,k)! -&
+	!dy/(g*dt)*(hvn*vn(j,k)-hvs*vn(j-1,k))
   !etan(j,k) = eta(j,k)
 END DO
 END DO
@@ -162,20 +164,24 @@ do k = 1,nx
     call GAUSS(Avn(:,k),Av0(:,k),Avs(:,k), Bu(:,k),etau(:,k),ny)
 end do
 
-unv(:,:) = 0.
-vnu(:,:) = 0.
 DO j = 1,ny
 DO k = 1,nx
-  unv(j,k) = un(j,k)-dt*g*(etau(j,k+1)-etau(j,k))/dx
-  vnu(j,k) = vn(j,k)-dt*g*(etav(j+1,k)-etav(j,k))/dy
+  vy(j,k) = - g*dt*(etau(j+1,k)-etau(j,k))/dy
+  uz(j,k) = - g*dt*(etav(j,k+1)-etav(j,k))/dx
 END DO
 END DO
+
+DO j = 1,ny
+DO k = 1,nx
+END DO
+END DO
+
 DO j = 1,ny
 DO k = 1,nx
 ! prediction for u
 
 uu = u(j,k)
-duu = dt*(un(j,k)+unv(j,k))
+duu = dt*(uy(j,k)+uz(j,k))
 IF(wet(j,k)==1) THEN
   IF((wet(j,k+1)==1).or.(duu>0.0)) un(j,k) = uu+duu
 ELSE
@@ -184,7 +190,7 @@ END IF
 
 ! prediction for v
 vv = v(j,k)
-dvv = dt*(vn(j,k)+vnu(j,k))
+dvv= dt*(vy(j,k)+vz(j,k)) 
 IF(wet(j,k)==1) THEN
   IF((wet(j+1,k)==1).or.(dvv>0.0)) vn(j,k) = vv+dvv
 ELSE
@@ -207,7 +213,7 @@ END SUBROUTINE dyn
 SUBROUTINE shapiro
 
 !local parameters
-REAL :: term1,term2,term3
+REAL*8 :: term1,term2,term3
 
 ! 1-order Shapiro filter
 
