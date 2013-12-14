@@ -15,13 +15,16 @@ REAL y
 end subroutine diag_sol
 
 !======================
-subroutine GAUSS(a,b,c,d,x)
+subroutine GAUSS(a,b,c,d,x,n)
 
 implicit none
-INTEGER ::  k
-REAL, dimension(0:nx+1) :: a,b,c,d,x
-REAL, dimension(0:nx) :: cc,dd
+INTEGER,intent(in) :: n
+REAL, dimension(1:n),intent(in) :: a,b,c,d
+REAL, dimension(0:n+1),intent(out) :: x
+!local 
+REAL, dimension(0:n) :: cc,dd
 REAL :: y
+INTEGER :: k
 !write(*,*) ' ====a=============='
 !write(*,*) a(:)
 !write(*,*) '=====b============='
@@ -34,23 +37,43 @@ REAL :: y
        cc(0) = 0.
        dd(0) = 0.
 
-       do k= 1,nx-1
+       do k= 1,n-1
           y = b(k)-cc(k-1)*a(k)
           cc(k) =c(k)/y
 	  dd(k) = (d(k)-dd(k-1)*a(k))/y
        end do
-       dd(nx) = (d(nx)-dd(nx-1)*a(nx))/(b(nx)-cc(nx-1)*a(nx))
+       dd(n) = (d(n)-dd(n-1)*a(n))/(b(n)-cc(n-1)*a(n))
      
        x(:) = 0. 
-       do k=nx,1,-1
+       do k=n,1,-1
 	  x(k)  = dd(k) - cc(k)*x(k+1)
        end do
      
+       call btrop_operator(a, b, c, x, d, n)
 !write(*,*) x
 !write(*,*) '=================='
      return
 end subroutine gauss
 !=======================
+subroutine btrop_operator(a, b, c, x, d,n)
+! !INPUT PARAMETERS:
+INTEGER, intent(in) ::  n 
+REAL, dimension(1:n), intent(in) :: a, b, c, d
+REAL, dimension(0:n+1), intent(in) ::  x
+! local 
+REAL, dimension(1:n) :: dd
+REAL :: err
+INTEGER :: j
+   err = 0.
+   do j= 1,n
+      dd(j) =  a(j)*x(j-1) +&
+		b(j)*x(j) +&
+		c(j)*x(j+1) 
+      err = err +abs(dd(j)-d(j))
+   end do
+   write(*,*) 'Tridiagonal Err = ', err
+
+ end subroutine btrop_operator
 
 
 function array_sum(X)

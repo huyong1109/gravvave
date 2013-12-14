@@ -43,10 +43,10 @@ CLOSE(10)
 eps = 0.05
 
 ! runtime parameters
-ntot = 50
+ntot = INT(100/dt)
 
 ! output parameter
-nout = 1
+nout = INT(0.5/dt)
 
 ! determine maximum water depth
 hmax = 0.

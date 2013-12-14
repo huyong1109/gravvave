@@ -86,8 +86,8 @@ END SUBROUTINE init
 SUBROUTINE dyn
 
 ! local parameters
-REAL, dimension(0:ny+1,0:nx+1):: du,dv
-REAL, dimension(3) :: aa,b,c,d,x
+REAL, dimension(0:ny+1,0:nx+1):: unv, vnu, du,dv
+!REAL, dimension(3) :: aa,b,c,d,x
 REAL :: uu, vv, duu, dvv
 REAL :: hue, huw, hwp, hwn, hen, hep
 REAL :: hvn, hvs, hsp, hsn, hnn, hnp
@@ -123,11 +123,15 @@ END DO
 !call GAUSS(aa,b,c,d, x,3)
 etau(:,:) = 0.
 etav(:,:) = 0.
+etau(1,:) = etav(:,1)
 do j = 1,ny
-    call GAUSS(Auw(j,:),Au0(j,:),Aue(j,:), Bu(j,:),etau(j,1:nx))
+    write(*,*) 'gauss in j = ', j
+    call GAUSS(Auw(j,:),Au0(j,:),Aue(j,:), Bu(j,:),etau(j,:),nx)
 end do
+
 do k = 1,nx
-    call GAUSS(Avn(:,k),Av0(:,k),Avs(:,k), Bv(:,k),etav(1:ny,k))
+    write(*,*) 'gauss in k = ', k
+    call GAUSS(Avn(:,k),Av0(:,k),Avs(:,k), Bv(:,k),etav(:,k),ny)
 end do
 DO j = 1,ny
 DO k = 1,nx
@@ -150,16 +154,20 @@ END DO
 END DO
 
 do j = 1,ny
-    call GAUSS(Auw(j,:),Au0(j,:),Aue(j,:), Bv(j,:),etav(j,:))
+    write(*,*) 'gauss in j = ', j
+    call GAUSS(Auw(j,:),Au0(j,:),Aue(j,:), Bv(j,:),etav(j,:),nx)
 end do
 do k = 1,nx
-    call GAUSS(Avn(:,k),Av0(:,k),Avs(:,k), Bu(:,k),etau(:,k))
+    write(*,*) 'gauss in k = ', k
+    call GAUSS(Avn(:,k),Av0(:,k),Avs(:,k), Bu(:,k),etau(:,k),ny)
 end do
 
+unv(:,:) = 0.
+vnu(:,:) = 0.
 DO j = 1,ny
 DO k = 1,nx
-  un(j,k) = un(j,k)-dt*g*(etau(j,k+1)-etau(j,k))/dx
-  vn(j,k) = vn(j,k)-dt*g*(etav(j+1,k)-etav(j,k))/dy
+  unv(j,k) = un(j,k)-dt*g*(etau(j,k+1)-etau(j,k))/dx
+  vnu(j,k) = vn(j,k)-dt*g*(etav(j+1,k)-etav(j,k))/dy
 END DO
 END DO
 DO j = 1,ny
@@ -167,7 +175,7 @@ DO k = 1,nx
 ! prediction for u
 
 uu = u(j,k)
-duu = dt*un(j,k)
+duu = dt*(un(j,k)+unv(j,k))
 IF(wet(j,k)==1) THEN
   IF((wet(j,k+1)==1).or.(duu>0.0)) un(j,k) = uu+duu
 ELSE
@@ -176,7 +184,7 @@ END IF
 
 ! prediction for v
 vv = v(j,k)
-dvv = dt*vn(j,k)
+dvv = dt*(vn(j,k)+vnu(j,k))
 IF(wet(j,k)==1) THEN
   IF((wet(j+1,k)==1).or.(dvv>0.0)) vn(j,k) = vv+dvv
 ELSE
