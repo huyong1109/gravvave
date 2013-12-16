@@ -12,7 +12,7 @@ hmin = 0.05
 ! grid parameters
 dx = 10.0
 dy = 10.0
-dt = 0.1*5
+dt = 0.01
 g = 9.81
 
 xxgtt = dx*dx/(g*dt*dt)
@@ -96,10 +96,10 @@ REAL*8 :: temp
 
 DO j = 1,ny
 DO k = 1,nx
-  hue = 0.5*( h(j,k) +h(j,k+1))
-  huw = 0.5*( h(j,k) +h(j,k-1))
-  hvn = 0.5*( h(j+1,k) +h(j,k))
-  hvs = 0.5*( h(j-1,k) +h(j,k))
+  hue = 0.5*( h(j,k) +h(j,k+1))*wet(j,k+1)
+  huw = 0.5*( h(j,k) +h(j,k-1))*wet(j,k-1)
+  hvn = 0.5*( h(j+1,k) +h(j,k))*wet(j+1,k)
+  hvs = 0.5*( h(j-1,k) +h(j,k))*wet(j-1,k)
   Au0(j,k) =   xxgtt + hue +huw
   Av0(j,k) =   yygtt + hvn +hvs
 
@@ -107,6 +107,10 @@ DO k = 1,nx
   Auw(j,k) =  -huw
   Avn(j,k) =  -hvn
   Avs(j,k) =  -hvs
+  hue = ( h(j,k) +h(j,k+1)*wet(j,k+1))/(1+wet(j,k+1))
+  huw = ( h(j,k) +h(j,k-1)*wet(j,k-1))/(1+wet(j,k-1))
+  hvn = ( h(j+1,k)*wet(j+1,k) +h(j,k))/(1+wet(j+1,k))
+  hvs = ( h(j-1,k)*wet(j-1,k) +h(j,k))/(1+wet(j-1,k))
   Bu(j,k) = xxgtt*eta(j,k) -&
 	dx/(g*dt)*(hue*u(j,k)-huw*u(j,k-1))
   Bv(j,k) = yygtt*eta(j,k) -&
@@ -118,13 +122,20 @@ END DO
 ! first step
 etau(:,:) = 0.
 etav(:,:) = 0.
+!write(*,*) '=============='
+!write(*,*) Auw(:,:)
+!write(*,*) '=============='
+!write(*,*) Au0(:,:)
+!write(*,*) '=============='
+!write(*,*) Aue(:,:)
+!write(*,*) '=============='
 do j = 1,ny
-    write(*,*) 'gauss in j = ', j
+!    write(*,*) 'gauss in j = ', j
     call GAUSS(Auw(j,:),Au0(j,:),Aue(j,:), Bu(j,:),etau(j,:),nx)
 end do
 
 do k = 1,nx
-    write(*,*) 'gauss in k = ', k
+!    write(*,*) 'gauss in k = ', k
     call GAUSS(Avn(:,k),Av0(:,k),Avs(:,k), Bv(:,k),etav(:,k),ny)
 end do
 uy(:,:) = 0.
@@ -156,11 +167,11 @@ END DO
 END DO
 
 do j = 1,ny
-    write(*,*) 'gauss in j = ', j
+!    write(*,*) 'gauss in j = ', j
     call GAUSS(Auw(j,:),Au0(j,:),Aue(j,:), Bv(j,:),etav(j,:),nx)
 end do
 do k = 1,nx
-    write(*,*) 'gauss in k = ', k
+!    write(*,*) 'gauss in k = ', k
     call GAUSS(Avn(:,k),Av0(:,k),Avs(:,k), Bu(:,k),etau(:,k),ny)
 end do
 

@@ -48,7 +48,8 @@ INTEGER :: k
        do k=n,1,-1
 	  x(k)  = dd(k) - cc(k)*x(k+1)
        end do
-     
+       x(0) = 10.
+       x(n+1) = 10.
 !       write(*,*) '=====x============='
 !       write(*,*) x
 !       call btrop_operator(a, b, c, x, d, n)

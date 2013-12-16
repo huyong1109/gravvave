@@ -43,10 +43,10 @@ CLOSE(10)
 eps = 0.05
 
 ! runtime parameters
-ntot = INT(100/dt)
+ntot = 10000 !CEILING(100/dt)
 
 ! output parameter
-nout = INT(0.5/dt)
+nout = 50! CEILING(0.5/dt)
 
 ! determine maximum water depth
 hmax = 0.
@@ -101,7 +101,6 @@ DO k = 0,nx+1
   IF(h(j,k)<hmin)wet(j,k) = 0
   u(j,k) = un(j,k)
   v(j,k) = vn(j,k)
-  eta(j,k) = etan(j,k)
 END DO
 END DO
 
