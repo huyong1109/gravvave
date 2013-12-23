@@ -43,10 +43,10 @@ CLOSE(10)
 eps = 0.05
 
 ! runtime parameters
-ntot = INT(100/dt)
+ntot = CEILING(100/dt)
 
 ! output parameter
-nout = INT(0.5/dt)
+nout = CEILING(0.5/dt)
 write(*,*) 'Run ',ntot,'iter, output every ',nout, 'iter' 
 
 ! determine maximum water depth

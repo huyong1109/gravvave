@@ -31,15 +31,17 @@ character (64) :: &
 !-----------------------------------------------------------------------
       WORK0(:,:) = B(:,:)*B(:,:)
 
-      rr = array_sum(WORK0) ! (r,r)
+      rr = array_sum_abs(WORK0) ! (r,r)
       solv_convrg = solv_tol*sqrt(rr)
-      write(*,*) '||B||=', solv_convrg
+      write(*,*) '=====||B||======='
+      write(*,'(E16.7)') solv_convrg
+      write(*,*) '================='
       
       call btrop_operator(S,X)
       R(:,:) = B(:,:) - S(:,:)
       WORK0(:,:) = R(:,:)*R(:,:)
 
-      rr = array_sum(WORK0) ! (r,r)
+      rr = array_sum_abs(WORK0) ! (r,r)
       if (rr < solv_convrg) then
         solv_sum_iters = 0
         write(*,*) 'Inital value is already a proper solution, res0=', rr
@@ -72,7 +74,7 @@ character (64) :: &
 ! update conjugate direction vector s
 !-----------------------------------------------------------------------
       !*** (r,(PC)r)
-      eta1 = array_sum(WORK0)
+      eta1 = array_sum_abs(WORK0)
       S(:,:) = WORK1(:,:) + S(:,:)*(eta1/eta0)
 
 !-----------------------------------------------------------------------
@@ -84,7 +86,7 @@ character (64) :: &
 ! compute next solution and residual
 !-----------------------------------------------------------------------
       eta0 = eta1
-      eta1 = eta0/array_sum(WORK0)
+      eta1 = eta0/array_sum_abs(WORK0)
 
       X(:,:) = X(:,:) + eta1*S(:,:)
       R(:,:) = R(:,:) - eta1*Q(:,:)
@@ -93,8 +95,9 @@ character (64) :: &
          call btrop_operator(R,X)
          R(:,:) = B(:,:) - R(:,:)
          WORK0(:,:) = R(:,:)*R(:,:)
-         rr = sqrt(array_sum(WORK0))! (r,r)
-         write(*,*) 'iter = ', m, 'res = ', rr ,'solv_c', solv_convrg
+         rr = sqrt(array_sum_abs(WORK0))! (r,r)
+         write(*,*) 'iter = ', m, 'res = '
+	 write(*,'(E16.7)')  rr
          if (rr < solv_convrg ) then
 	    exit iter_loop
          elseif ( rr > 1.0e20) then

@@ -12,14 +12,14 @@ hmin = 0.05
 ! grid parameters
 dx = 10.0
 dy = 10.0
-dt = 0.1*2
+dt = 0.01
 dtxx = dt/(dx*dx)
 dtyy = dt/(dy*dy)
 ! physical parameters
 g = 9.81
 
 ! init solver
-solv_tol = 1.0e-32
+solv_tol = 1.0e-15
 write(*,*) 'solv_tol', solv_tol
 ! initial conditions
 
@@ -73,9 +73,9 @@ END DO
 
 A0(:,:) = 0.
 Axe(:,:) = 0.
-Axw(:,:) = 0.
+!Axw(:,:) = 0.
 Ayn(:,:) = 0.
-Ays(:,:) = 0.
+!Ays(:,:) = 0.
 B(:,:) = 0.
 END SUBROUTINE init
 
@@ -90,25 +90,41 @@ REAL*8 :: hvn, hvs, hsp, hsn, hnn, hnp
 REAL*8 :: temp
 ! implicit method to solve sea level predictor
 
+write(*,*) 'dtxx', dtxx
+write(*,*) 'dtyy', dtyy
 DO j = 1,ny
 DO k = 1,nx
-  hue = 0.5*( h(j,k) +h(j,k+1))
-  huw = 0.5*( h(j,k) +h(j,k-1))
-  hvn = 0.5*( h(j,k+1) +h(j,k))
-  hvs = 0.5*( h(j,k-1) +h(j,k))
-  A0(j,k) =   1 + g*(dtxx*(hue+huw) +dtyy*(hvn+hvs))
+  hue = 0.5*( h(j,k) +h(j,k+1))*wet(j,k+1)
+  huw = 0.5*( h(j,k) +h(j,k-1))*wet(j,k-1)
+  hvn = 0.5*( h(j+1,k) +h(j,k))*wet(j+1,k)
+  hvs = 0.5*( h(j-1,k) +h(j,k))*wet(j-1,k)
+  A0(j,k) =   1.0 + g*(dtxx*(hue+huw) +dtyy*(hvn+hvs))
   Axe(j,k) = -g*hue*dtxx
   Axw(j,k) = -g*huw*dtxx
   Ayn(j,k) = -g*hvn*dtyy
   Ays(j,k) = -g*hvs*dtyy
+  hue = ( h(j,k) +h(j,k+1)*wet(j,k+1))/(1+wet(j,k+1))
+  huw = ( h(j,k) +h(j,k-1)*wet(j,k-1))/(1+wet(j,k-1))
+  hvn = ( h(j+1,k)*wet(j+1,k) +h(j,k))/(1+wet(j+1,k))
+  hvs = ( h(j-1,k)*wet(j-1,k) +h(j,k))/(1+wet(j-1,k))
   B(j,k) =  eta(j,k) -&
 	dt*((hue*u(j,k)-huw*u(j,k-1))/dx+(hvn*v(j,k)-hvs*v(j-1,k))/dy)
   !etan(j,k) = eta(j,k)
 END DO
 END DO
-
-!write(*,*) A0
-!write(*,*) Axe
+!DO j = 1,ny
+!Axe(j,0) = 0!-g*dtxx*0.5*( h(j,1) )!+h(j,0))
+!!Axe(j,nx) = 0!-g*dtxx*0.5*( h(j,1) )!+h(j,0))
+!END DO
+!DO k = 1,nx
+!Ayn(0,k) = 0!-g*dtyy*0.5*( h(1,k) )!+h(0,k))
+!!Ayn(ny,k) = 0
+!END DO
+!write(*,*) 'Axe(20)', h(20,0)
+!write(*,*) 'Ayn(20)', h(0,20)
+!write(*,*) 'h(20)', h(20,20)
+!write(*,*) 'A0(2)', A0(20,20)
+!write(*,*) 'Axe(20)', Axe(20,20)
 
 !      temp  = array_sum_abs(A0)
 !	    write(*,*) 'sum(A0) = ',temp
@@ -130,11 +146,12 @@ END DO
 call pcg(etan, B)
 
 CALL shapiro
+!eta(:,:) =etan(:,:)
 ! write(*,*) etan
 DO j = 1,ny
 DO k = 1,nx
-  du(j,k) = -dt*g*(eta(j,k+1)-eta(j,k))/dx
-  dv(j,k) = -dt*g*(eta(j+1,k)-eta(j,k))/dy
+  du(j,k) = -dt*g*(etan(j,k+1)-etan(j,k))/dx
+  dv(j,k) = -dt*g*(etan(j+1,k)-etan(j,k))/dy
 END DO
 END DO
 
@@ -164,7 +181,12 @@ END IF
 END DO
 END DO
 
-
+DO j = 1,ny
+    un(j,nx) = u(j,nx)
+END DO
+DO k = 1,nx
+   vn(ny,k) = v(ny,k)   
+END DO
 
 END SUBROUTINE dyn
 
